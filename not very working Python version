@@ -14,7 +14,7 @@ size=[800,600]
 screen = pygame.display.set_mode((size[0], size[1]))
 dims=2
 squares=[]
-#square format: [ [[position,velocity],[position,velocity]], [size,size],mass]
+#square format: [ [[position,velocity],[position,velocity]], [size,size], mass ]
 #call format: square[square][characteristic][dimension?][position or velocity]
 squares.append([[[size[0]/2,1],[size[1]/2,1]],[50,50],1])
 squares.append([[[size[0]/2,1],[size[1]/2,-1]],[50,50],1])
@@ -40,6 +40,7 @@ def collideWithWalls(sq):
                 squaro[0]+=squaro[1]
         squarino[0][dim]=squaro
         squares[sq]=squarino
+
 def lineSphereIntersection(lineOrigin,lineVelocity,sphereOrigin,sphereRadius,dimensions):
     #Ask Mathematica whether it can be simplified:
     #(sqrt((x*t+y*u+z*v)^2-(t^2+u^2+v^2)*(x^2+y^2+z^2-r^2))-(x*t+y*u+z*v))/(t^2+u^2+v^2)
@@ -63,20 +64,38 @@ def lineSphereIntersection(lineOrigin,lineVelocity,sphereOrigin,sphereRadius,dim
             t=t1
         else:
             t=t2
- 
-def tangentSphereCollision(sphere1,m1,sphere2,m2):
-    for di in dimensions:
-        differences.append(lineOrigin[di]-sphereOrigin[di])
- 
-def collideBalls(i,i2):
-    
- 
+
+def dotProduct(a,b):
+    d=0
+    for i in len(a):
+        d+=a[i]*b[i]
+    return d
+
 def lineCollision(m1,v1,m2,v2):
-    global v3
-    v3=((m1-m2)*v1+(2*m2)*v2)/(m1+m2)
-    global v4
-    v4=((m2-m1)*v2+(2*m1)*v1)/(m1+m2)
- 
+    global rV
+    rV=[((m1-m2)*v1+(2*m2)*v2)/(m1+m2),((m2-m1)*v2+(2*m1)*v1)/(m1+m2)]
+
+def tangentSphereCollision(spheres):
+    dM=0
+    differences=[]
+    sphereVs=[[],[]]
+    for di in dimensions:
+        differences.append(spheres[1][0][di][0]-spheres[0][0][di][0])
+        dM+=differences[di]^2
+        for i in range(2):
+            sphereVs[i].append(spheres[i][0][di][1])
+    dM=math.sqrt(dM)
+    if sphere[1][2]=0:
+        #for raytracing
+    else:
+        Ca=[]
+        for i in 2:
+            Ca.append(dotProduct(sphereVs[i],differences))
+        lineCollision(spheres[0][2],Ca[0],spheres[1][2],Ca[1])
+        for i in 2:
+            for di in dimensions:
+                resultantVelocities[i].append(sphereVs[i][di]+(rV[i]-Ca[i])*(differences[di]/dM))
+
 while 1:
     for i in range(len(squares)):
         collideWithWalls(i)
