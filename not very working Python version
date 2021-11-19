@@ -54,16 +54,17 @@ def lineSphereIntersection(lineOrigin,lineVelocity,sphereOrigin,sphereRadius,dim
         A+=lineVelocity[di]^2
         B+=differences[di]*lineVelocity[di]
         C+=differences[di]^2
-    D=B^2-A*C
-    if D>0:
+    D=B**2-A*C
+    if not D<0:
         D=math.sqrt(D)/2
         t1=(D-B)/A
         t2=(-D-B)/A
-        global t
         if t1<t2 and t1>0:
             t=t1
         else:
             t=t2
+        if t>0:
+            return t
 
 def dotProduct(a,b):
     d=0
@@ -72,26 +73,43 @@ def dotProduct(a,b):
     return d
 
 def lineCollision(m1,v1,m2,v2):
-    global rV
     rV=[((m1-m2)*v1+(2*m2)*v2)/(m1+m2),((m2-m1)*v2+(2*m1)*v1)/(m1+m2)]
+    return rV
 
-def tangentSphereCollision(spheres):
+def tangentSphereCollision(spheres,refract,n):
     dM=0
     differences=[]
     sphereVs=[[],[]]
     for di in dimensions:
         differences.append(spheres[1][0][di][0]-spheres[0][0][di][0])
         dM+=differences[di]^2
-        for i in range(2):
+        for i in 2:
             sphereVs[i].append(spheres[i][0][di][1])
     dM=math.sqrt(dM)
-    if sphere[1][2]=0:
+    if sphere[1][2]==0:
         #for raytracing
+        velocityDifferences=[]
+        for i in dimensions:
+            velocityDifferences.append(sphereVs[0][i]-sphereVs[1][i])
+        Ca=2*dotProduct(velocityDifferences,differences)/(dM**2)
+        collisionDeltaV=[]
+        for i in dimensions:
+            collisionDeltaV.append(Ca*differences[i])
+        discriminant=1-((n**2)*(1-Ca**2))
+        resultantRayVelocity=[]
+        for i in dimensions:
+            if refract==1 and discriminant>0:
+                component=spheres[1][0][i][1]+n*(differences[i]-2*collisionDeltaV[i])-(velocityDifferences[i]*sqrt(discriminant))
+            else:
+                component=spheres[1][0][i][1]+collisionDeltaV[i]-2*spheres[0][0][i][1]
+            resultantRayVelocity.append(component)
+        return resultantRayVelocity
     else:
         Ca=[]
         for i in 2:
             Ca.append(dotProduct(sphereVs[i],differences))
         lineCollision(spheres[0][2],Ca[0],spheres[1][2],Ca[1])
+        resultantVelocity=[[],[]]
         for i in 2:
             for di in dimensions:
                 resultantVelocities[i].append(sphereVs[i][di]+(rV[i]-Ca[i])*(differences[di]/dM))
