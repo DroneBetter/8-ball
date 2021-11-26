@@ -1,4 +1,4 @@
-import sys, pygame, time, math
+import sys, pygame, time, math, random
 from pygame.locals import *
  
 pygame.init()
@@ -13,11 +13,13 @@ def drawSquare(w,h,x,y,r,g,b):
 size=[800,600]
 screen = pygame.display.set_mode((size[0], size[1]))
 dims=2
+drag=0
+gravitationalConstant=100
 squares=[]
 #square format: [ [[position,velocity],[position,velocity]], [size,size], mass ]
 #call format: square[square][characteristic][dimension?][position or velocity]
-squares.append([[[size[0]/2,1],[size[1]/2,1]],[50,50],1])
-squares.append([[[size[0]/2,1],[size[1]/2,-1]],[50,50],1])
+for i in range(3):
+    squares.append([[[random.random()*size[0],1],[random.random()*size[1],-1]],[40]*2,10])
  
 def reflect(squaro,mirror,nextValue):
     squaro[0]=mirror*2-nextValue
@@ -41,7 +43,7 @@ def collideWithWalls(sq):
         squarino[0][dim]=squaro
         squares[sq]=squarino
 
-def lineSphereIntersection(lineOrigin,lineVelocity,sphereOrigin,sphereRadius,dimensions):
+def lineSphereIntersection(lineOrigin,lineVelocity,sphereOrigin,sphereRadius):
     #Ask Mathematica whether it can be simplified:
     #(sqrt((x*t+y*u+z*v)^2-(t^2+u^2+v^2)*(x^2+y^2+z^2-r^2))-(x*t+y*u+z*v))/(t^2+u^2+v^2)
     global D
@@ -49,7 +51,7 @@ def lineSphereIntersection(lineOrigin,lineVelocity,sphereOrigin,sphereRadius,dim
     A=0
     B=0
     C=-sphereRadius^2
-    for di in dimensions:
+    for di in range(dims):
         differences.append(lineOrigin[di]-sphereOrigin[di])
         A+=lineVelocity[di]^2
         B+=differences[di]*lineVelocity[di]
@@ -80,7 +82,7 @@ def tangentSphereCollision(spheres,refract,n):
     dM=0
     differences=[]
     sphereVs=[[],[]]
-    for di in dimensions:
+    for di in range(dims):
         differences.append(spheres[1][0][di][0]-spheres[0][0][di][0])
         dM+=differences[di]^2
         for i in 2:
@@ -89,15 +91,15 @@ def tangentSphereCollision(spheres,refract,n):
     if sphere[1][2]==0:
         #for raytracing
         velocityDifferences=[]
-        for i in dimensions:
+        for i in range(dims):
             velocityDifferences.append(sphereVs[0][i]-sphereVs[1][i])
         Ca=2*dotProduct(velocityDifferences,differences)/(dM**2)
         collisionDeltaV=[]
-        for i in dimensions:
+        for i in range(dims):
             collisionDeltaV.append(Ca*differences[i])
         discriminant=1-((n**2)*(1-Ca**2))
         resultantRayVelocity=[]
-        for i in dimensions:
+        for i in range(dims):
             if refract==1 and discriminant>0:
                 component=spheres[1][0][i][1]+n*(differences[i]-2*collisionDeltaV[i])-(velocityDifferences[i]*sqrt(discriminant))
             else:
@@ -111,13 +113,29 @@ def tangentSphereCollision(spheres,refract,n):
         lineCollision(spheres[0][2],Ca[0],spheres[1][2],Ca[1])
         resultantVelocity=[[],[]]
         for i in 2:
-            for di in dimensions:
+            for di in range(dims):
                 resultantVelocities[i].append(sphereVs[i][di]+(rV[i]-Ca[i])*(differences[di]/dM))
 
 while 1:
     for i in range(len(squares)):
+        absVel=0
+        if drag>0:
+            for di in range(dims):
+                absVel+=squares[i][0][di][1]**2
+            absVel=math.sqrt(absVel) #each dimension's deceleration from drag is its magnitude as a component of the unit vector of velocity times absolute velocity squared, is actual component times absolute velocity.
+            for di in range(dims):
+                squares[i][0][di][1]*=1-absVel*drag
         collideWithWalls(i)
-        for i2 in range(i,len(squares)):
-            collideBalls(i,i2)
+        for i2 in range(i+1,len(squares)):
+            differences=[]
+            absDiff=0 
+            for di in range(dims):
+                differences.append(squares[i2][0][di][0]-squares[i][0][di][0])
+                absDiff+=differences[di]**2
+            absDiff=gravitationalConstant/(absDiff*math.sqrt(absDiff))
+            for di in range(dims):
+                squares[i][0][di][1]+=absDiff*differences[di]*squares[i2][2]
+                squares[i2][0][di][1]-=absDiff*differences[di]*squares[i][2]
+        #    collideBalls(i,i2)
         drawSquare(squares[i][1][0],squares[i][1][1],squares[i][0][0][0]-50,squares[i][0][1][0]-50,255,255,255)
     time.sleep(1/60)
