@@ -17,7 +17,7 @@ drag=0
 gravitationalConstant=100
 #square format: [ [[position,velocity],[position,velocity]], [size,size], mass ]
 #call format: square[square][characteristic][dimension?][position or velocity]
-squares=[ [ [[random.random()*size[i],0] for i in dims], [40]*2, 10 ] for i2 range(3)]
+squares=[ [ [[random.random()*size[i],0] for i in range(dims)], [40]*2, 10 ] for i2 in range(3)]
  
 def reflect(squaro,mirror,nextValue):
     squaro[0]=mirror*2-nextValue
@@ -53,7 +53,9 @@ def lineSphereIntersection(line,sphereRadius): #line formatted like square posit
         B+=line[di][0]*line[di][1]
         C+=line[di][0]**2
     D=B**2-A*C
-    if D<0:
+    if A==0:
+        return -1/2**55
+    elif D<0:
         return D
     else:
         D=math.sqrt(D)/2
@@ -65,12 +67,11 @@ def lineSphereIntersection(line,sphereRadius): #line formatted like square posit
             t=t2
         if t>0:
             return t
+        else:
+            return -1/2**55
 
 def dotProduct(a,b):
-    d=0
-    for i in len(a):
-        d+=a[i]*b[i]
-    return d
+    return sum([a[i]*b[i] for i in range(len(a))])
 
 def lineCollision(m1,v1,m2,v2):
     rV=[((m1-m2)*v1+(2*m2)*v2)/(m1+m2),((m2-m1)*v2+(2*m1)*v1)/(m1+m2)]
@@ -82,21 +83,21 @@ def tangentSphereCollision(spheres,refract,n):
     sphereVs=[[],[]]
     for di in range(dims):
         differences.append(spheres[1][0][di][0]-spheres[0][0][di][0])
-        dM+=differences[di]^2
-        for i in 2:
+        dM+=differences[di]**2
+        for i in range(2):
             sphereVs[i].append(spheres[i][0][di][1])
     dM=math.sqrt(dM)
-    if sphere[1][2]==0:
+    if spheres[1][2]==0:
         #for raytracing
         velocityDifferences=[sphereVs[0][i]-sphereVs[1][i] for i in range(dims)]
         Ca=2*dotProduct(velocityDifferences,differences)/(dM**2)
-        collisionDeltaV=[Ca*differences[i] for i in range(dims)]
+        collisionDeltaV=[Ca*differences[di] for di in range(dims)]
         discriminant=1-((n**2)*(1-Ca**2))
-        return [spheres[1][0][i][1]+n*(differences[i]-2*collisionDeltaV[i])-(velocityDifferences[i]*sqrt(discriminant)) if (refract==1 and discriminant>0) else spheres[1][0][i][1]+collisionDeltaV[i]-2*spheres[0][0][i][1] for i in range(dims)]
+        return [spheres[1][0][di][1]+n*(differences[di]-2*collisionDeltaV[di])-(velocityDifferences[di]*sqrt(discriminant)) if (refract==1 and discriminant>0) else spheres[1][0][i][1]+collisionDeltaV[i]-2*spheres[0][0][i][1] for di in range(dims)]
     else:
-        Ca=[dotProduct(sphereVs[i],differences) for i in 2]
-        lineCollision(spheres[0][2],Ca[0],spheres[1][2],Ca[1])
-        return [[sphereVs[i][di]+(rV[i]-Ca[i])*(differences[di]/dM) for di in range(dims)] for i in range(2)]
+        Ca=[dotProduct([spheres[i][0][di][1] for di in range(dims)],differences) for i in range(2)]
+        rV=lineCollision(spheres[0][2],Ca[0],spheres[1][2],Ca[1])
+        return [[spheres[i][0][di][1]+(rV[i]-Ca[i])*(differences[di]/dM) for di in range(dims)] for i in range(2)]
 
 def proceedTime(timeToProceed):
     for i in range(len(squares)):
@@ -123,9 +124,9 @@ def physics():
         timeToProceed=1-timeProceeded
         candidates=[]
         for i in range(len(squares)-1):
-            for i2 in range(i,len(squares)):
+            for i2 in range(i+1,len(squares)):
                 t=lineSphereIntersection([[squares[i2][0][di][der]-squares[i][0][di][der] for der in range(2)] for di in range(dims)], squares[i2][1][0]+squares[i][1][0])
-                if not t<0 and not t>timeToProceed:
+                if not (t<0 or t>timeToProceed):
                     timeToProceed=t
                     candidates=[i,i2]
         proceedTime(timeToProceed)
