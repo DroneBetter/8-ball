@@ -92,18 +92,11 @@ def tangentSphereCollision(spheres,refract,n):
         Ca=2*dotProduct(velocityDifferences,differences)/(dM**2)
         collisionDeltaV=[Ca*differences[i] for i in range(dims)]
         discriminant=1-((n**2)*(1-Ca**2))
-        resultantRayVelocity=[]
-        for i in range(dims):
-            if refract==1 and discriminant>0:
-                component=spheres[1][0][i][1]+n*(differences[i]-2*collisionDeltaV[i])-(velocityDifferences[i]*sqrt(discriminant))
-            else:
-                component=spheres[1][0][i][1]+collisionDeltaV[i]-2*spheres[0][0][i][1]
-            resultantRayVelocity.append(component)
-        return resultantRayVelocity
+        return [spheres[1][0][i][1]+n*(differences[i]-2*collisionDeltaV[i])-(velocityDifferences[i]*sqrt(discriminant)) if (refract==1 and discriminant>0) else spheres[1][0][i][1]+collisionDeltaV[i]-2*spheres[0][0][i][1] for i in range(dims)]
     else:
         Ca=[dotProduct(sphereVs[i],differences) for i in 2]
         lineCollision(spheres[0][2],Ca[0],spheres[1][2],Ca[1])
-        resultantVelocities=[[sphereVs[i][di]+(rV[i]-Ca[i])*(differences[di]/dM) for di in range(dims)] for i in range(2)]
+        return [[sphereVs[i][di]+(rV[i]-Ca[i])*(differences[di]/dM) for di in range(dims)] for i in range(2)]
 
 def proceedTime(timeToProceed):
     for i in range(len(squares)):
@@ -126,18 +119,18 @@ def physics():
         #    collideBalls(i,i2)
     cycles=0
     timeProceeded=0
-    while cycles==0 or timeToProceed>0:
-        timeToProceed=0
+    while cycles==0 or len(candidates)>0:
+        timeToProceed=1-timeProceeded
+        candidates=[]
         for i in range(len(squares)-1):
             for i2 in range(i,len(squares)):
                 t=lineSphereIntersection([[squares[i2][0][di][der]-squares[i][0][di][der] for der in range(2)] for di in range(dims)], squares[i2][1][0]+squares[i][1][0])
-                if t>0 and not t>1-timeProceeded and (timeToProceed==0 or t<timeToProceed):
+                if not t<0 and not t>timeToProceed:
                     timeToProceed=t
                     candidates=[i,i2]
-        if timeToProceed>0:
-            proceedTime(timeToProceed)
+        proceedTime(timeToProceed)
+        if len(candidates)>0:
             tangentSphereCollision([squares[candidates[i]] for i in range(2)],0,0)
-    proceedTime(1-timeProceeded)
 
 while 1:
     physics()
