@@ -3,9 +3,9 @@ from pygame.locals import *
  
 pygame.init()
  
-def drawSquare(w,h,x,y,r,g,b):
+def drawSquare(w,h,x,y,colour):
     surf = pygame.Surface((w, h))
-    surf.fill((r, g, b))
+    surf.fill((colour[0],colour[1],colour[2]))
     rect = surf.get_rect()
     screen.blit(surf, (x, y))
  
@@ -14,10 +14,11 @@ black=0,0,0
 screen = pygame.display.set_mode((size[0], size[1]))
 dims=2
 drag=0
+FPS=60
 gravitationalConstant=100
 #square format: [ [[position,velocity],[position,velocity]], [size,size], mass ]
 #call format: square[square][characteristic][dimension?][position or velocity]
-squares=[ [ [[random.random()*size[i],0] for i in range(dims)], [40]*2, 10 ] for i2 in range(3)]
+squares=[ [ [[random.random()*size[i],0] for i in range(dims)], [40]*2, 10, [255*int(i2==i) for i in range(3)] ] for i2 in range(3)]
  
 def reflect(squaro,mirror,nextValue):
     squaro[0]=mirror*2-nextValue
@@ -103,6 +104,8 @@ def proceedTime(timeToProceed):
     for i in range(len(squares)):
         for di in range(dims):
             squares[i][0][di][0]+=squares[i][0][di][1]
+    global timeProceeded
+    timeProceeded+=timeToProceed
 
 def physics():
     for i in range(len(squares)):
@@ -111,16 +114,18 @@ def physics():
             for di in range(dims):
                 squares[i][0][di][1]*=1-absVel*drag #air resistance
         collideWithWalls(i)
+    for i in range(len(squares)-1):
         for i2 in range(i+1,len(squares)):
             differences=[squares[i2][0][di][0]-squares[i][0][di][0] for di in range(dims)]
             gravity=gravitationalConstant/math.sqrt(sum([differences[di]**2 for di in range(dims)])**3)
             for di in range(dims):
                 squares[i][0][di][1]+=differences[di]*gravity*squares[i2][2]
                 squares[i2][0][di][1]-=differences[di]*gravity*squares[i][2]
-        #    collideBalls(i,i2)
     cycles=0
+    global timeProceeded
     timeProceeded=0
     while cycles==0 or len(candidates)>0:
+        cycles+=1
         timeToProceed=1-timeProceeded
         candidates=[]
         for i in range(len(squares)-1):
@@ -131,12 +136,19 @@ def physics():
                     candidates=[i,i2]
         proceedTime(timeToProceed)
         if len(candidates)>0:
-            tangentSphereCollision([squares[candidates[i]] for i in range(2)],0,0)
+            if 0==1: #testing
+                for di in range(dims):
+                        squares[candidates[i]][0][di][1]*=-1
+            else:
+                resVel=tangentSphereCollision([squares[candidates[i]] for i in range(2)],0,0)
+                for i in range(2):
+                    for di in range(dims):
+                        squares[candidates[i]][0][di][1]=resVel[i][di]
 
 while 1:
     physics()
     screen.fill(black)
     for i in range(len(squares)):
-        drawSquare(squares[i][1][0]+40,squares[i][1][1]+40,squares[i][0][0][0]-40,squares[i][0][1][0]-40,255,255,255)
+        drawSquare(squares[i][1][0]+20,squares[i][1][1]+20,squares[i][0][0][0]-20,squares[i][0][1][0]-20,squares[i][3])
     pygame.display.flip()
-    time.sleep(1/60)
+    time.sleep(1/FPS)
