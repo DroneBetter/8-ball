@@ -3,44 +3,30 @@ from pygame.locals import *
  
 pygame.init()
  
-def drawSquare(w,h,x,y,colour):
-    surf = pygame.Surface((w, h))
-    surf.fill((colour[0],colour[1],colour[2]))
-    rect = surf.get_rect()
-    screen.blit(surf, (x, y))
- 
+def drawShape(w,h,x,y,colour,shape):
+    color=(colour[0],colour[1],colour[2])
+    if shape==0:
+        surf = pygame.Surface((w, h))
+        surf.fill(color)
+        rect = surf.get_rect()
+        screen.blit(surf, (x, y))
+    else:
+        pygame.draw.circle(screen, color, (x, y), w/2)
+
 size=[800,600]
 black=0,0,0
 screen = pygame.display.set_mode((size[0], size[1]))
 dims=2
 drag=0
 FPS=60
-gravitationalConstant=100
+gravitationalConstant=min(size)/FPS
 #square format: [ [[position,velocity],[position,velocity]], [size,size], mass ]
 #call format: square[square][characteristic][dimension?][position or velocity]
-squares=[ [ [[random.random()*size[i],0] for i in range(dims)], [40]*2, 10, [255*int(i2==i) for i in range(3)] ] for i2 in range(3)]
+squares=[ [ [[random.random()*size[i],0] for i in range(dims)], [40]*2, 10, [int(255*(math.cos((i2/9-i/3)*2*math.pi)+1)/2) for i in range(3)] ] for i2 in range(9)]
  
 def reflect(squaro,mirror,nextValue):
     squaro[0]=mirror*2-nextValue
     squaro[1]*=-1
- 
-def collideWithWalls(sq):
-    global squares
-    for dim in range(dims):
-        squarino=squares[sq]
-        squaro=squarino[0][dim]
-        nextValue=squaro[0]+squaro[1]
-        mirror=size[dim]
-        if nextValue>mirror:
-             reflect(squaro,mirror,nextValue)
-        else:
-            mirror=0+squarino[1][dim]
-            if nextValue<mirror:
-                 reflect(squaro,mirror,nextValue)
-            else:
-                squaro[0]+=squaro[1]
-        squarino[0][dim]=squaro
-        squares[sq]=squarino
 
 def lineSphereIntersection(line,sphereRadius): #line formatted like square position/velocity list
     #Ask Mathematica whether it can be simplified:
@@ -78,27 +64,25 @@ def lineCollision(m1,v1,m2,v2):
     rV=[((m1-m2)*v1+(2*m2)*v2)/(m1+m2),((m2-m1)*v2+(2*m1)*v1)/(m1+m2)]
     return rV
 
-def tangentSphereCollision(spheres,refract,n):
+def tangentSphereCollision(spheres,refract,n): #n is refractive index
     dM=0
-    differences=[]
+    differences=[[],[]]
     sphereVs=[[],[]]
     for di in range(dims):
-        differences.append(spheres[1][0][di][0]-spheres[0][0][di][0])
-        dM+=differences[di]**2
         for i in range(2):
-            sphereVs[i].append(spheres[i][0][di][1])
+            differences[i].append(spheres[1][0][di][i]-spheres[0][0][di][i])
+        dM+=differences[0][di]**2
     dM=math.sqrt(dM)
     if spheres[1][2]==0:
         #for raytracing
-        velocityDifferences=[sphereVs[0][i]-sphereVs[1][i] for i in range(dims)]
-        Ca=2*dotProduct(velocityDifferences,differences)/(dM**2)
-        collisionDeltaV=[Ca*differences[di] for di in range(dims)]
+        Ca=2*dotProduct(differences[1],differences[0])/(dM**2)
+        collisionDeltaV=[Ca*differences[0][di] for di in range(dims)]
         discriminant=1-((n**2)*(1-Ca**2))
-        return [spheres[1][0][di][1]+n*(differences[di]-2*collisionDeltaV[di])-(velocityDifferences[di]*sqrt(discriminant)) if (refract==1 and discriminant>0) else spheres[1][0][i][1]+collisionDeltaV[i]-2*spheres[0][0][i][1] for di in range(dims)]
+        return [spheres[1][0][di][1]+n*(differences[0][di]-2*collisionDeltaV[di])-(velocityDifferences[di]*sqrt(discriminant)) if (refract==1 and discriminant>0) else spheres[1][0][i][1]+collisionDeltaV[i]-2*spheres[0][0][i][1] for di in range(dims)]
     else:
-        Ca=[dotProduct([spheres[i][0][di][1] for di in range(dims)],differences) for i in range(2)]
+        Ca=[dotProduct([spheres[i][0][di][1] for di in range(dims)],differences[0])/dM for i in range(2)]
         rV=lineCollision(spheres[0][2],Ca[0],spheres[1][2],Ca[1])
-        return [[spheres[i][0][di][1]+(rV[i]-Ca[i])*(differences[di]/dM) for di in range(dims)] for i in range(2)]
+        return [[spheres[i][0][di][1]+(rV[i]-Ca[i])*differences[0][di]/dM for di in range(dims)] for i in range(2)]
 
 def proceedTime(timeToProceed):
     for i in range(len(squares)):
@@ -113,7 +97,6 @@ def physics():
             absVel=math.sqrt(sum([squares[i][0][di][1]**2 for di in range(dims)])) #each dimension's deceleration from drag is its magnitude as a component of the unit vector of velocity times absolute velocity squared, is actual component times absolute velocity.
             for di in range(dims):
                 squares[i][0][di][1]*=1-absVel*drag #air resistance
-        collideWithWalls(i)
     for i in range(len(squares)-1):
         for i2 in range(i+1,len(squares)):
             differences=[squares[i2][0][di][0]-squares[i][0][di][0] for di in range(dims)]
@@ -128,14 +111,32 @@ def physics():
         cycles+=1
         timeToProceed=1-timeProceeded
         candidates=[]
-        for i in range(len(squares)-1):
+        for i in range(len(squares)):
+            for di in range(dims):
+                squaro=squares[i][0][di]
+                nextValue=squaro[0]+squaro[1]
+                mirror=squares[i][1][di]
+                if nextValue<mirror:
+                    t=(mirror-squaro[0])/squaro[1]
+                else:
+                    mirror=size[di]
+                    if nextValue>mirror:
+                        t=(mirror-squaro[0])/squaro[1]
+                    else:
+                        t=-1
+                if not (t<0 or t>timeToProceed):
+                    timeToProceed=t
+                    candidates=[i]
+                    canDi=di #delicious
             for i2 in range(i+1,len(squares)):
                 t=lineSphereIntersection([[squares[i2][0][di][der]-squares[i][0][di][der] for der in range(2)] for di in range(dims)], squares[i2][1][0]+squares[i][1][0])
                 if not (t<0 or t>timeToProceed):
                     timeToProceed=t
                     candidates=[i,i2]
         proceedTime(timeToProceed)
-        if len(candidates)>0:
+        if len(candidates)==1:
+            squares[candidates[0]][0][canDi][1]*=-1
+        elif len(candidates)==2:
             if 0==1: #testing
                 for di in range(dims):
                         squares[candidates[i]][0][di][1]*=-1
@@ -149,6 +150,6 @@ while 1:
     physics()
     screen.fill(black)
     for i in range(len(squares)):
-        drawSquare(squares[i][1][0]+20,squares[i][1][1]+20,squares[i][0][0][0]-20,squares[i][0][1][0]-20,squares[i][3])
+        drawShape(squares[i][1][0]+20,squares[i][1][1]+20,squares[i][0][0][0]-20,squares[i][0][1][0]-20,squares[i][3],1)
     pygame.display.flip()
     time.sleep(1/FPS)
