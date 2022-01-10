@@ -19,6 +19,7 @@ screen = pygame.display.set_mode((size[0], size[1]))
 dims=2
 drag=0
 FPS=60
+perspectiveMode=0
 gravitationalConstant=min(size)/FPS
 #square format: [ [[position,velocity],[position,velocity]], [size,size], mass ]
 #call format: square[square][characteristic][dimension?][position or velocity]
@@ -60,6 +61,54 @@ def lineSphereIntersection(line,sphereRadius): #line formatted like square posit
 def dotProduct(a,b):
     return sum([a[i]*b[i] for i in range(len(a))])
 
+
+def quaternionMultiply(a,b):
+    return [a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3],a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1],a[0]*b[3]+a[1]*b[2]+a[2]*b[1]+a[3]*b[0]]
+
+def quaternionConjugate(q):
+    return [q[0]]+[-q[i+1] for i in range(len(q)-1)]
+
+def rotateByLocalGimbals(q,g):
+    magnitude=math.sqrt(sum([i**2 for i in g]))
+    return quaternionMultiply([cos(magnitude),[i*math.sin(magnitude)/magnitude for i in g]],q)
+
+def rotateVector(v,q,perspective,sR): #sR is stereographic radius (to be passed through to perspective function)
+    rotated=quaternionMultiply(quaternionMultiply(q,[0]+v),quaternoinConjugate(q))
+    if perspective==1:
+        return projectSpaceToScreen([rotated[i]-camera[i] for i in range[dims]],sR)
+    else:
+        return rotated
+
+def rotate2D(vector,angle):
+    return [sum([vector[j]*cos(pi/2*(j-i)) for j in range(2)]) for i in range(2)]
+
+def projectSpaceToScreen(v,sR): #Outputs list of two coordinates
+    if projectionMode==0: #The strange mode which stretches each hemisphere to a square
+        return [atan2(v[i],v[2]) for i in range(2)]
+    elif projectionMode<5: # Azimuthal ones
+        newRadius=0
+        smagnitude=sum([v[i]**2 for i in range(2)])
+        magnitude=math.atan2(math.sqrt(smagnitude,v[2]))
+        if projectionMode==2: #Equi-area (equidistant is projectionMode 1)
+            magnitude=sqrt(math.sin(magnitude)**2+math.cos(magnitude-1)**2)
+        elif projectionMode==3: #Stereographic (the best projection)
+            if sR>0:
+                shragnitude=math.asin(sR/math.sqrt(smagnitude**2+v[2]**2))
+                rotaterinos=[]
+                for i in range(2):
+                    rotagnitude=rotate2D(smagnitude+[v[2]],shragnitude*(1-2*i))
+                    guacnitude=projectSpaceToScreen([rotagnitude[0],0,rotagnitude[1]],0) #frankly delicious
+                    rotaterinos.append(math.atan2(math.sqrt(sum([guacnitude[j]**2 for j in range(2)]),v[2])))
+                newRadius=rotaterinos[1]-rotaterinos[0]
+                magnitude=sum(rotaterinos)/2
+            else:
+                magnitude=math.sin(magnitude)/1-math.cos(magnitude)
+        direction=atan2(v[0],v[1])
+        outputPosition=[magnitude*cos(direction+pi*i) for i in 2]
+        if not(newRadius==0):
+            outputPosition.append(newRadius)
+
+
 def lineCollision(m1,v1,m2,v2):
     rV=[((m1-m2)*v1+(2*m2)*v2)/(m1+m2),((m2-m1)*v2+(2*m1)*v1)/(m1+m2)]
     return rV
@@ -100,7 +149,7 @@ def physics():
     for i in range(len(squares)-1):
         for i2 in range(i+1,len(squares)):
             differences=[squares[i2][0][di][0]-squares[i][0][di][0] for di in range(dims)]
-            gravity=gravitationalConstant/math.sqrt(sum([differences[di]**2 for di in range(dims)])**3)
+            gravity=gravitationalConstant/math.sqrt(sum([di**2 for di in differences])**3)
             for di in range(dims):
                 squares[i][0][di][1]+=differences[di]*gravity*squares[i2][2]
                 squares[i2][0][di][1]-=differences[di]*gravity*squares[i][2]
@@ -124,7 +173,7 @@ def physics():
                         t=(mirror-squaro[0])/squaro[1]
                     else:
                         t=-1
-                if not (t<0 or t>timeToProceed):
+                if 0<=t<=timeToProceed:
                     timeToProceed=t
                     candidates=[i]
                     canDi=di #delicious
