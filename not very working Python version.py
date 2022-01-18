@@ -2,7 +2,6 @@ import sys, pygame, time, math, random
 from pygame.locals import *
  
 pygame.init()
- 
 def drawShape(w,h,x,y,colour,shape):
     color=(colour[0],colour[1],colour[2])
     if shape==0:
@@ -20,11 +19,16 @@ dims=2
 drag=0
 FPS=60
 perspectiveMode=0
+projectionMode=1
 gravitationalConstant=min(size)/FPS
+
 #square format: [ [[position,velocity],[position,velocity]], [size,size], mass ]
 #call format: square[square][characteristic][dimension?][position or velocity]
 squares=[ [ [[random.random()*size[i],0] for i in range(dims)], [40]*2, 10, [int(255*(math.cos((i2/9-i/3)*2*math.pi)+1)/2) for i in range(3)] ] for i2 in range(9)]
- 
+
+cameraPosition=[0]*dims
+cameraOrientation=[1]+[0]*3
+
 def reflect(squaro,mirror,nextValue):
     squaro[0]=mirror*2-nextValue
     squaro[1]*=-1
@@ -72,13 +76,6 @@ def rotateByLocalGimbals(q,g):
     magnitude=math.sqrt(sum([i**2 for i in g]))
     return quaternionMultiply([cos(magnitude),[i*math.sin(magnitude)/magnitude for i in g]],q)
 
-def rotateVector(v,q,perspective,sR): #sR is stereographic radius (to be passed through to perspective function)
-    rotated=quaternionMultiply(quaternionMultiply(q,[0]+v),quaternoinConjugate(q))
-    if perspective==1:
-        return projectSpaceToScreen([rotated[i]-camera[i] for i in range[dims]],sR)
-    else:
-        return rotated
-
 def rotate2D(vector,angle):
     return [sum([vector[j]*cos(pi/2*(j-i)) for j in range(2)]) for i in range(2)]
 
@@ -107,7 +104,33 @@ def projectSpaceToScreen(v,sR): #Outputs list of two coordinates
         outputPosition=[magnitude*cos(direction+pi*i) for i in 2]
         if not(newRadius==0):
             outputPosition.append(newRadius)
+        return outputPosition
 
+def rotateVector(v,q,perspective,*sR): #sR is stereographic radius (to be passed through to perspective function)
+    rotated=quaternionMultiply(quaternionMultiply(q,[0]+v),quaternionConjugate(q))
+    if perspective==1:
+        return projectSpaceToScreen([rotated[i]-camera[i] for i in range[dims]],sR)
+    else:
+        return rotated
+
+def screenPosition(position,*sR):
+    return rotateVector(position,cameraOrientation,perspectiveMode,sR)
+
+def render3D():
+    screenPositions=[screenPosition([squares[i][di][0]-cameraPosition[di] for di in range(dims)],squares[i][1][0]) for i in range(len(squares))] #is 4 elements long instead of 3 if stereographic (last element is the screen radius (do not forget (very important)))
+    distances=[sum([screenPositions[i][di]**2 for di in range(dims)]) for i in range(len(squares))] #is actually distances squared (to be more elegant)
+    powers=[distances[i]-squares[i][1][0]**2 for i in range(len(squares))] #render order is by spheres' "powers" (squared distance from centre to camera minus squared radius)
+    for i in [x for _, x in sorted(zip([i for i in range(len(squares))], powers))]: #probably not most elegant solution, from the answer to sorting lists by other lists here: https://stackoverflow.com/a/6618543/
+        if perspectiveMode==0:
+            sizes=squares[i][1]
+        elif projectionMode==4:
+            sizes=[screenPositions[i][3]]*(dims-1) #delightfully devilish
+        else:
+            if False:
+                sizes=math.asin(squares[i][1][0]/math.sqrt(distances[i]+squares[i][1][0]**2))*2*max(screenSize)*(dims-1)
+            else:
+                sizes=math.atan(squares[i][1][0]/math.sqrt(distances[i]))*2*max(screenSize)*(dims-1) #you would think is wrong, but is actually identical at positive distance (which is always) https://www.wolframalpha.com/input/?i=atan%281%2Fx%29-asin%281%2Fsqrt%281%2Bx%5E2%29%29
+        drawShape(sizes[0],sizes[1],screenPositions[0],screenPositions[1],i[3],1)
 
 def lineCollision(m1,v1,m2,v2):
     rV=[((m1-m2)*v1+(2*m2)*v2)/(m1+m2),((m2-m1)*v2+(2*m1)*v1)/(m1+m2)]
@@ -123,7 +146,7 @@ def tangentSphereCollision(spheres,refract,n): #n is refractive index
         dM+=differences[0][di]**2
     dM=math.sqrt(dM)
     if spheres[1][2]==0:
-        #for raytracing
+        #will be for raytracing
         Ca=2*dotProduct(differences[1],differences[0])/(dM**2)
         collisionDeltaV=[Ca*differences[0][di] for di in range(dims)]
         discriminant=1-((n**2)*(1-Ca**2))
