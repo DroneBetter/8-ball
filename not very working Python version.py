@@ -1,5 +1,6 @@
-import sys, pygame, time, math, random
+import sys, pygame, math, random
 from pygame.locals import *
+clock=pygame.time.Clock()
  
 pygame.init()
 def drawShape(w,h,x,y,colour,shape):
@@ -27,7 +28,7 @@ gravitationalConstant=min(size)/FPS
 squares=[ [ [[random.random()*size[i],0] for i in range(dims)], [40]*2, 10, [int(255*(math.cos((i2/9-i/3)*2*math.pi)+1)/2) for i in range(3)] ] for i2 in range(9)]
 
 cameraPosition=[0]*dims
-cameraOrientation=[1]+[0]*3
+cameraOrientation=[[1]+[0]*3]*2
 
 def reflect(squaro,mirror,nextValue):
     squaro[0]=mirror*2-nextValue
@@ -74,20 +75,20 @@ def quaternionConjugate(q):
 
 def rotateByLocalGimbals(q,g):
     magnitude=math.sqrt(sum([i**2 for i in g]))
-    return quaternionMultiply([cos(magnitude),[i*math.sin(magnitude)/magnitude for i in g]],q)
+    return quaternionMultiply([math.cos(magnitude),[i*math.sin(magnitude)/magnitude for i in g]],q)
 
 def rotate2D(vector,angle):
-    return [sum([vector[j]*cos(pi/2*(j-i)) for j in range(2)]) for i in range(2)]
+    return [sum([vector[j]*math.cos(math.pi/2*(j-i)) for j in range(2)]) for i in range(2)]
 
 def projectSpaceToScreen(v,sR): #Outputs list of two coordinates
     if projectionMode==0: #The strange mode which stretches each hemisphere to a square
-        return [atan2(v[i],v[2]) for i in range(2)]
+        return [math.atan2(v[i],v[2]) for i in range(2)]
     elif projectionMode<5: # Azimuthal ones
         newRadius=0
         smagnitude=sum([v[i]**2 for i in range(2)])
         magnitude=math.atan2(math.sqrt(smagnitude,v[2]))
         if projectionMode==2: #Equi-area (equidistant is projectionMode 1)
-            magnitude=sqrt(math.sin(magnitude)**2+math.cos(magnitude-1)**2)
+            magnitude=math.sqrt(math.sin(magnitude)**2+math.cos(magnitude-1)**2)
         elif projectionMode==3: #Stereographic (the best projection)
             if sR>0:
                 shragnitude=math.asin(sR/math.sqrt(smagnitude**2+v[2]**2))
@@ -100,8 +101,8 @@ def projectSpaceToScreen(v,sR): #Outputs list of two coordinates
                 magnitude=sum(rotaterinos)/2
             else:
                 magnitude=math.sin(magnitude)/1-math.cos(magnitude)
-        direction=atan2(v[0],v[1])
-        outputPosition=[magnitude*cos(direction+pi*i) for i in 2]
+        direction=math.atan2(v[0],v[1])
+        outputPosition=[magnitude*math.cos(direction+math.pi*i) for i in 2]
         if not(newRadius==0):
             outputPosition.append(newRadius)
         return outputPosition
@@ -109,7 +110,7 @@ def projectSpaceToScreen(v,sR): #Outputs list of two coordinates
 def rotateVector(v,q,perspective,*sR): #sR is stereographic radius (to be passed through to perspective function)
     rotated=quaternionMultiply(quaternionMultiply(q,[0]+v),quaternionConjugate(q))
     if perspective==1:
-        return projectSpaceToScreen([rotated[i]-camera[i] for i in range[dims]],sR)
+        return projectSpaceToScreen([rotated[i]-cameraPosition[i] for i in range[dims]],sR)
     else:
         return rotated
 
@@ -120,26 +121,25 @@ def render3D():
     screenPositions=[screenPosition([squares[i][di][0]-cameraPosition[di] for di in range(dims)],squares[i][1][0]) for i in range(len(squares))] #is 4 elements long instead of 3 if stereographic (last element is the screen radius (do not forget (very important)))
     distances=[sum([screenPositions[i][di]**2 for di in range(dims)]) for i in range(len(squares))] #is actually distances squared (to be more elegant)
     powers=[distances[i]-squares[i][1][0]**2 for i in range(len(squares))] #render order is by spheres' "powers" (squared distance from centre to camera minus squared radius)
-    for i in [x for _, x in sorted(zip([i for i in range(len(squares))], powers))]: #probably not most elegant solution, from the answer to sorting lists by other lists here: https://stackoverflow.com/a/6618543/
-        if perspectiveMode==0:
-            sizes=squares[i][1]
-        elif projectionMode==4:
+    for i in sorted(zip([i for i in range(len(squares))], powers)): #probably not most elegant solution, from the answer to sorting lists by other lists here: https://stackoverflow.com/a/6618543/
+        if projectionMode==4:
             sizes=[screenPositions[i][3]]*(dims-1) #delightfully devilish
         else:
-            if False:
-                sizes=math.asin(squares[i][1][0]/math.sqrt(distances[i]+squares[i][1][0]**2))*2*max(screenSize)*(dims-1)
-            else:
-                sizes=math.atan(squares[i][1][0]/math.sqrt(distances[i]))*2*max(screenSize)*(dims-1) #you would think is wrong, but is actually identical at positive distance (which is always) https://www.wolframalpha.com/input/?i=atan%281%2Fx%29-asin%281%2Fsqrt%281%2Bx%5E2%29%29
+            sizes=squares[i][1]
+            if perspectiveMode==1:
+                if sizes!=1:
+                    sizes=math.asin(sizes[0]/math.sqrt(distances[i]+squares[i][1][0]**2))*2*max(size)*(dims-1)
+                else:
+                    sizes=math.atan(sizes[0]/math.sqrt(distances[i]))*2*max(size)*(dims-1) #you would think is wrong, but is actually identical at positive distance (which is always), atan(r/x)-asin(r/sqrt(r^2+x^2))=0 when x is positive (otherwise it is a corkscrew shape dependent on the angle from x to r)
         drawShape(sizes[0],sizes[1],screenPositions[0],screenPositions[1],i[3],1)
 
 def lineCollision(m1,v1,m2,v2):
-    rV=[((m1-m2)*v1+(2*m2)*v2)/(m1+m2),((m2-m1)*v2+(2*m1)*v1)/(m1+m2)]
-    return rV
+    return [((m1-m2)*v1+(2*m2)*v2)/(m1+m2),((m2-m1)*v2+(2*m1)*v1)/(m1+m2)]
 
 def tangentSphereCollision(spheres,refract,n): #n is refractive index
     dM=0
-    differences=[[],[]]
-    sphereVs=[[],[]]
+    differences=[[]]*2
+    sphereVs=[[]]*2
     for di in range(dims):
         for i in range(2):
             differences[i].append(spheres[1][0][di][i]-spheres[0][0][di][i])
@@ -150,7 +150,7 @@ def tangentSphereCollision(spheres,refract,n): #n is refractive index
         Ca=2*dotProduct(differences[1],differences[0])/(dM**2)
         collisionDeltaV=[Ca*differences[0][di] for di in range(dims)]
         discriminant=1-((n**2)*(1-Ca**2))
-        return [spheres[1][0][di][1]+n*(differences[0][di]-2*collisionDeltaV[di])-(velocityDifferences[di]*sqrt(discriminant)) if (refract==1 and discriminant>0) else spheres[1][0][i][1]+collisionDeltaV[i]-2*spheres[0][0][i][1] for di in range(dims)]
+        return [spheres[1][0][di][1]+n*(differences[0][di]-2*collisionDeltaV[di])-(differences[1][di]*math.sqrt(discriminant)) if (refract==1 and discriminant>0) else spheres[1][0][i][1]+collisionDeltaV[i]-2*spheres[0][0][i][1] for di in range(dims)]
     else:
         Ca=[dotProduct([spheres[i][0][di][1] for di in range(dims)],differences[0])/dM for i in range(2)]
         rV=lineCollision(spheres[0][2],Ca[0],spheres[1][2],Ca[1])
@@ -218,10 +218,34 @@ def physics():
                     for di in range(dims):
                         squares[candidates[i]][0][di][1]=resVel[i][di]
 
-while 1:
+gain=1
+angularVelocityConversionFactor=1/FPS/4
+fieldOfView=math.pi
+run=True
+while run:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            run = False
     physics()
     screen.fill(black)
-    for i in range(len(squares)):
-        drawShape(squares[i][1][0]+20,squares[i][1][1]+20,squares[i][0][0][0]-20,squares[i][0][1][0]-20,squares[i][3],1)
+    keys=pygame.key.get_pressed()
+    arrowAccs=[(keys[pygame.K_RIGHT]-keys[pygame.K_LEFT]),(keys[pygame.K_DOWN]-keys[pygame.K_UP])]
+    if arrowAccs[0]!=0!=arrowAccs[1]: #Will normalise such that absolute value of 6D vector of spatial and angular acceleration is 1 but there are only 2 currently
+        arrowAccs=[arrowAccs[i]/math.sqrt(2) for i in range(2)]
+    if dims==3:
+        for di in range(1,4): #Quaternions are pretty cool I believe
+            cameraOrientation[1][di]+=arrowAccs[di]*gain*angularVelocityConversionFactor
+            cameraOrientation[1][di]/=1+drag #cameraOrientation[1][0] isn't used (because they're yaw,pitch,roll (but they pretend to be i,j,k))
+        mouse=pygame.mouse
+        mouserino=mouse.get_rel*mouse.get_pressed
+        mouserino.append(0)
+        cameraOrientation[0]=rotateByLocalGimbals(cameraOrientation[0],[cameraOrientation[1][di+1]+mouserino[di]*fieldOfView/size[0] for di in range(3)])
+        render3D()
+    else:
+        if dims==2:
+            for di in range(2):
+                squares[0][0][di][1]+=arrowAccs[di]*gain
+        for i in range(len(squares)):
+            drawShape(squares[i][1][0]+20,squares[i][1][1]+20,squares[i][0][0][0]-20,squares[i][0][1][0]-20,squares[i][3],1)
     pygame.display.flip()
-    time.sleep(1/FPS)
+    clock.tick(FPS)
