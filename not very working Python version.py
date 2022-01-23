@@ -51,7 +51,7 @@ def lineSphereIntersection(line,sphereRadius): #line formatted like square posit
     elif D<0:
         return D
     else:
-        D=math.sqrt(D)/2
+        D=math.sqrt(D)
         t1=(D-B)/A
         t2=(-D-B)/A
         if t1<t2 and t1>0:
@@ -138,12 +138,8 @@ def lineCollision(m1,v1,m2,v2):
 
 def tangentSphereCollision(spheres,refract,n): #n is refractive index
     dM=0
-    differences=[[]]*2
-    sphereVs=[[]]*2
-    for di in range(dims):
-        for i in range(2):
-            differences[i].append(spheres[1][0][di][i]-spheres[0][0][di][i])
-        dM+=differences[0][di]**2
+    differences=[[spheres[1][0][di][i]-spheres[0][0][di][i]) for i in range(2)] for di in range(dims)]
+    dM=sum([differences[0][di]**2 for di in range(dims)])
     dM=math.sqrt(dM)
     if spheres[1][2]==0:
         #will be for raytracing
@@ -162,6 +158,11 @@ def proceedTime(timeToProceed):
             squares[i][0][di][0]+=squares[i][0][di][1]
     global timeProceeded
     timeProceeded+=timeToProceed
+
+def setCandidate(candidate,t):
+    if 0<=t<=timeToProceed:
+    timeToProceed=t
+    candidates=candidate
 
 def physics():
     for i in range(len(squares)):
@@ -196,22 +197,16 @@ def physics():
                         t=(mirror-squaro[0])/squaro[1]
                     else:
                         t=-1
-                if 0<=t<=timeToProceed:
-                    timeToProceed=t
-                    candidates=[i]
-                    canDi=di #delicious
+                setCandidate([i,-di-1],t)
             for i2 in range(i+1,len(squares)):
-                t=lineSphereIntersection([[squares[i2][0][di][der]-squares[i][0][di][der] for der in range(2)] for di in range(dims)], squares[i2][1][0]+squares[i][1][0])
-                if not (t<0 or t>timeToProceed):
-                    timeToProceed=t
-                    candidates=[i,i2]
+                setCandidate([i,i2],lineSphereIntersection([[squares[i2][0][di][der]-squares[i][0][di][der] for der in range(2)] for di in range(dims)], squares[i2][1][0]+squares[i][1][0]))
         proceedTime(timeToProceed)
-        if len(candidates)==1:
-            squares[candidates[0]][0][canDi][1]*=-1
+        if candidates[1]<0:
+            squares[candidates[0]][0][-candidates[1]-1][1]*=-1
         elif len(candidates)==2:
             if 0==1: #testing
                 for di in range(dims):
-                        squares[candidates[i]][0][di][1]*=-1
+                    squares[candidates[i]][0][di][1]*=-1
             else:
                 resVel=tangentSphereCollision([squares[candidates[i]] for i in range(2)],0,0)
                 for i in range(2):
