@@ -138,7 +138,7 @@ def lineCollision(m1,v1,m2,v2):
 
 def tangentSphereCollision(spheres,refract,n): #n is refractive index
     dM=0
-    differences=[[spheres[1][0][di][i]-spheres[0][0][di][i]) for i in range(2)] for di in range(dims)]
+    differences=[[spheres[1][0][di][i]-spheres[0][0][di][i] for i in range(2)] for di in range(dims)]
     dM=sum([differences[0][di]**2 for di in range(dims)])
     dM=math.sqrt(dM)
     if spheres[1][2]==0:
@@ -160,9 +160,9 @@ def proceedTime(timeToProceed):
     timeProceeded+=timeToProceed
 
 def setCandidate(candidate,t):
-    if 0<=t<=timeToProceed:
     timeToProceed=t
-    candidates=candidate
+    if 0<=t<=timeToProceed:
+        candidates=candidate
 
 def physics():
     for i in range(len(squares)):
